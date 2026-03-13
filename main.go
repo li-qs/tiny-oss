@@ -14,7 +14,8 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
+	"github.com/labstack/echo/v5/middleware"
 	"gopkg.in/yaml.v3"
 )
 
@@ -56,26 +57,6 @@ type File struct {
 	CreatedAt    string `db:"created_at"`
 }
 
-// ==============================
-// 🔴 API 鉴权中间件（必须传 token）
-// ==============================
-func apiAuth() echo.MiddlewareFunc {
-	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
-			// 支持从 header 或 query 传参
-			token := c.Request().Header.Get("X-API-Token")
-			if token == "" {
-				token = c.QueryParam("api_token")
-			}
-
-			if token == "" || token != config.Security.APIToken {
-				return c.JSON(403, map[string]string{"msg": "无权限访问"})
-			}
-			return next(c)
-		}
-	}
-}
-
 func main() {
 	err := loadConfig()
 	if err != nil {
@@ -89,12 +70,18 @@ func main() {
 
 	_ = os.MkdirAll("./uploads", 0755)
 	e := echo.New()
+	e.Use(middleware.RequestLogger())
 
-	// 图片访问（公开）
+	// CORS 修复：去掉 echo.GET 常量
+	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowOrigins: []string{"*"},
+		AllowMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders: []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAuthorization},
+	}))
+
+	// 全部使用指针路由
 	e.GET("/i/:filename", serveFile)
-
-	// 🔴 所有 API 必须加 token 才能访问
-	api := e.Group("/api", apiAuth())
+	api := e.Group("/api", apiAuth)
 	api.POST("/upload", upload)
 	api.GET("/files", listFiles)
 	api.DELETE("/file/:id", deleteFile)
@@ -103,9 +90,26 @@ func main() {
 }
 
 // ==============================
+// 🔴 API 鉴权中间件（必须传 token）
+// ==============================
+func apiAuth(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c *echo.Context) error {
+		token := c.Request().Header.Get("X-API-Token")
+		if token == "" {
+			token = c.QueryParam("api_token")
+		}
+
+		if token == "" || token != config.Security.APIToken {
+			return c.JSON(403, map[string]string{"msg": "无权限访问"})
+		}
+		return next(c)
+	}
+}
+
+// ==============================
 // 上传
 // ==============================
-func upload(c echo.Context) error {
+func upload(c *echo.Context) error {
 	isCompress, _ := strconv.Atoi(c.FormValue("compress"))
 	quality, _ := strconv.Atoi(c.FormValue("quality"))
 	isPrivate, _ := strconv.Atoi(c.FormValue("private"))
@@ -147,10 +151,7 @@ func upload(c echo.Context) error {
 	})
 }
 
-// ==============================
-// 访问图片
-// ==============================
-func serveFile(c echo.Context) error {
+func serveFile(c *echo.Context) error {
 	filename := c.Param("filename")
 	path := "./uploads/" + filename
 
@@ -175,12 +176,6 @@ func serveFile(c echo.Context) error {
 // 压缩 + 旋转
 // ==============================
 func compressImage(src, dst string, quality int) error {
-	file, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
 	img, err := imaging.Open(src, imaging.AutoOrientation(true))
 	if err != nil {
 		return err
@@ -207,7 +202,7 @@ func compressImage(src, dst string, quality int) error {
 // ==============================
 // 分页列表
 // ==============================
-func listFiles(c echo.Context) error {
+func listFiles(c *echo.Context) error {
 	page, _ := strconv.Atoi(c.QueryParam("page"))
 	pageSize, _ := strconv.Atoi(c.QueryParam("page_size"))
 
@@ -265,7 +260,7 @@ func listFiles(c echo.Context) error {
 // ==============================
 // 删除
 // ==============================
-func deleteFile(c echo.Context) error {
+func deleteFile(c *echo.Context) error {
 	id := c.Param("id")
 
 	var f File
@@ -280,9 +275,6 @@ func deleteFile(c echo.Context) error {
 	return c.JSON(200, map[string]string{"msg": "删除成功"})
 }
 
-// ==============================
-// 工具
-// ==============================
 func isImage(ext string) bool {
 	ext = strings.ToLower(ext)
 	return ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".gif"
