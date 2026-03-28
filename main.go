@@ -186,14 +186,18 @@ func upload(c *echo.Context) error {
 	}
 
 	return c.JSON(200, map[string]any{
-		"url":      buildURL(filename),
+		"url":      buildURL(c, filename),
 		"filename": filename,
 		"size":     finalSize,
 	})
 }
 
-func buildURL(filename string) string {
-	return config.App.FileBaseURL + "/" + filename
+func buildURL(c *echo.Context, filename string) string {
+	if config.App.FileBaseURL != "" {
+		return config.App.FileBaseURL + "/" + filename
+	} else {
+		return c.Scheme() + "://" + c.Request().Host + "/i/" + filename
+	}
 }
 
 func serveFile(c *echo.Context) error {
