@@ -30,6 +30,9 @@ type Config struct {
 		Token    string `yaml:"token"`
 		APIToken string `yaml:"api_token"`
 	} `yaml:"security"`
+	App struct {
+		FileBaseURL string `yaml:"file_base_url"`
+	} `yaml:"app"`
 }
 
 var (
@@ -183,14 +186,14 @@ func upload(c *echo.Context) error {
 	}
 
 	return c.JSON(200, map[string]any{
-		"url":      buildURL(c, filename),
+		"url":      buildURL(filename),
 		"filename": filename,
 		"size":     finalSize,
 	})
 }
 
-func buildURL(c *echo.Context, filename string) string {
-	return c.Scheme() + "://" + c.Request().Host + "/i/" + filename
+func buildURL(filename string) string {
+	return config.App.FileBaseURL + "/" + filename
 }
 
 func serveFile(c *echo.Context) error {
