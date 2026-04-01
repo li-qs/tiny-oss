@@ -5,6 +5,7 @@ import (
 	"image/jpeg"
 	"image/png"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -81,14 +82,12 @@ func main() {
 	e.Use(middleware.RequestLogger())
 	e.Use(middleware.BodyLimit(50 << 20))
 
-	// CORS 修复：去掉 echo.GET 常量
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
 		AllowOrigins: []string{"*"},
 		AllowMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders: []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAuthorization},
 	}))
 
-	// 全部使用指针路由
 	e.GET("/i/:filename", serveFile)
 	api := e.Group("/api", apiAuth)
 	api.POST("/upload", upload)
@@ -109,7 +108,7 @@ func apiAuth(next echo.HandlerFunc) echo.HandlerFunc {
 		}
 
 		if token == "" || token != config.Security.APIToken {
-			return c.JSON(403, map[string]string{"msg": "无权限访问"})
+			return c.JSON(403, map[string]string{"msg": "无访问权限"})
 		}
 		return next(c)
 	}
@@ -213,7 +212,7 @@ func serveFile(c *echo.Context) error {
 	uuid := strings.TrimSuffix(filename, ext)
 
 	if len(uuid) != 32 {
-		return c.NoContent(404)
+		return c.JSON(404, map[string]string{"msg": "文件不存在"})
 	}
 
 	dir := filepath.Join(getUploadDir(), uuid[:2], uuid[2:4])
@@ -223,22 +222,28 @@ func serveFile(c *echo.Context) error {
 	var f File
 	err := db.Get(&f, "SELECT is_private FROM files WHERE uuid=?", uuid[:32])
 	if err != nil {
-		return c.NoContent(404)
+		return c.JSON(404, map[string]string{"msg": "文件不存在"})
 	}
 
 	if f.IsPrivate == 1 {
 		token := c.QueryParam("token")
 		if token != config.Security.Token {
-			return c.NoContent(403)
+			return c.JSON(403, map[string]string{"msg": "无访问权限"})
 		}
 	}
 
-	// 👉 文件存在检查
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return c.NoContent(404)
+	fi, err := os.Stat(path)
+	if os.IsNotExist(err) || fi.IsDir() {
+		return c.JSON(404, map[string]string{"msg": "文件不存在"})
 	}
 
-	return c.File(path)
+	ff, err := os.Open(path)
+	if err != nil {
+		return c.JSON(404, map[string]string{"msg": "文件不存在"})
+	}
+
+	http.ServeContent(c.Response(), c.Request(), fi.Name(), fi.ModTime(), ff)
+	return nil
 }
 
 // ==============================
