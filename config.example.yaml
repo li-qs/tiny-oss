@@ -1,0 +1,13 @@
+db:
+  dsn: "user:password@tcp(host:3306)/dbname?charset=utf8mb4&parseTime=True&loc=Asia%2FShanghai"
+
+server:
+  port: ":3005"
+
+security:
+  token: "change-me-64-char-random-string"
+  api_token: "change-me-another-64-char-random-string"
+
+app:
+  file_base_url: "http://localhost:3005/i"
+  upload_dir: "./uploads"
