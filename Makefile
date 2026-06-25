@@ -9,7 +9,7 @@ PLATFORMS=linux-amd64 darwin-amd64 windows-amd64 darwin-arm64
 
 .PHONY: all clean app
 
-all: app
+all: clean app
 
 app: $(PLATFORMS:%=app-%)
 
