@@ -59,6 +59,10 @@ func ListFiles(c *echo.Context) error {
 		return c.JSON(500, map[string]any{"msg": "获取失败", "err": err.Error()})
 	}
 
+	for i := range list {
+		list[i].URL = buildURL(c, list[i].Filename)
+	}
+
 	var total int
 	_ = db.DB.Get(&total, "SELECT COUNT(*) FROM files")
 

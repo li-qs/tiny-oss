@@ -9,4 +9,5 @@ type File struct {
 	Ext          string `db:"ext" json:"ext"`
 	IsPrivate    int    `db:"is_private" json:"is_private"`
 	CreatedAt    string `db:"created_at" json:"created_at"`
+	URL          string `json:"url"`
 }

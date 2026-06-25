@@ -1,5 +1,5 @@
-NAME=myoss
-BIN_DIR=$(CURDIR)/build
+NAME=tinyoss
+BUILD_DIR=$(CURDIR)/build
 
 APP_DIR=$(CURDIR)/cmd/app
 
@@ -14,11 +14,11 @@ all: clean app
 app: $(PLATFORMS:%=app-%)
 
 app-%:
-	@mkdir -p $(BIN_DIR)
+	@mkdir -p $(BUILD_DIR)
 	GOOS=$(word 1,$(subst -, ,$*)) \
 	GOARCH=$(word 2,$(subst -, ,$*)) \
 	CGO_ENABLED=0 \
-	go build -o $(BIN_DIR)/$(APP_NAME)-$* $(APP_DIR)
+	go build -o $(BUILD_DIR)/$(APP_NAME)-$* $(APP_DIR)
 
 clean:
 	rm -rf $(BUILD_DIR)
